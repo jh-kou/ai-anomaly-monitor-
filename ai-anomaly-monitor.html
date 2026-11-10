@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自选股异动风险提示 Agent · 产品Demo</title>
+<link rel="stylesheet" href="https://unpkg.com/tdesign-vue-next/dist/tdesign.min.css">
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/tdesign-vue-next/dist/tdesign.min.js"></script>
+<script src="https://unpkg.com/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root { --up:#D54941; --down:#2BA471; --brand:#0052D9; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--td-bg-color-page); font-family:var(--td-font-family); }
+  #app { height:100vh; }
+
+  .layout { display:flex; height:100vh; overflow:hidden; }
+  .sidebar { width:216px; flex-shrink:0; background:#001a57; display:flex; flex-direction:column; color:rgba(255,255,255,.9); }
+  .logo { height:64px; display:flex; align-items:center; gap:10px; padding:0 20px; font-size:16px; font-weight:600; color:#fff; border-bottom:1px solid rgba(255,255,255,.08); }
+  .logo-mark { width:30px; height:30px; border-radius:8px; flex-shrink:0; background:linear-gradient(135deg,#366EF4,#0052D9); display:flex; align-items:center; justify-content:center; }
+  .side-menu { flex:1; padding:12px 10px; }
+  .side-item { display:flex; align-items:center; gap:10px; padding:11px 14px; margin-bottom:4px; border-radius:6px; cursor:pointer; font-size:14px; color:rgba(255,255,255,.72); transition:all .18s; }
+  .side-item:hover { background:rgba(255,255,255,.08); color:#fff; }
+  .side-item.active { background:var(--td-brand-color); color:#fff; font-weight:500; }
+  .side-foot { padding:14px 20px; font-size:12px; color:rgba(255,255,255,.35); border-top:1px solid rgba(255,255,255,.08); line-height:18px; }
+
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .topbar { height:64px; flex-shrink:0; background:var(--td-bg-color-container); display:flex; align-items:center; padding:0 24px; gap:16px; border-bottom:1px solid var(--td-component-stroke); }
+  .topbar-title { font-size:18px; font-weight:600; color:var(--td-text-color-primary); }
+  .topbar-sub { font-size:12px; color:var(--td-text-color-placeholder); margin-left:2px; }
+  .topbar-right { margin-left:auto; display:flex; align-items:center; gap:16px; }
+  .live-dot { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--td-text-color-secondary); }
+  .pulse { width:8px; height:8px; border-radius:50%; background:var(--td-success-color); animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(43,164,113,.5)} 70%{box-shadow:0 0 0 7px rgba(43,164,113,0)} 100%{box-shadow:0 0 0 0 rgba(43,164,113,0)} }
+  .clock { font-variant-numeric:tabular-nums; font-size:13px; color:var(--td-text-color-secondary); }
+
+  .content { flex:1; overflow-y:auto; padding:24px; }
+  .view { max-width:1440px; margin:0 auto; }
+  .card { background:var(--td-bg-color-container); border-radius:6px; box-shadow:var(--td-shadow-1); padding:20px; }
+  .card-title { font-size:16px; font-weight:600; color:var(--td-text-color-primary); display:flex; align-items:center; gap:8px; }
+  .card-extra { margin-left:auto; font-size:12px; color:var(--td-text-color-placeholder); font-weight:400; }
+  .grid { display:grid; gap:16px; }
+
+  .kpi-row { grid-template-columns:repeat(4,1fr); margin-bottom:16px; }
+  .kpi-label { font-size:13px; color:var(--td-text-color-secondary); }
+  .kpi-value { font-size:30px; font-weight:600; margin-top:6px; color:var(--td-text-color-primary); font-variant-numeric:tabular-nums; }
+  .kpi-trend { font-size:12px; margin-top:6px; }
+  .kpi-icon { width:38px; height:38px; border-radius:8px; display:flex; align-items:center; justify-content:center; float:right; }
+
+  .up { color:var(--up); } .down { color:var(--down); }
+  .mkt-card { cursor:pointer; transition:box-shadow .15s; }
+  .mkt-card:hover { box-shadow:var(--td-shadow-2); }
+
+  /* ===== 异动时间线 ===== */
+  .tl { position:relative; padding-left:24px; margin-top:4px; }
+  .tl::before { content:""; position:absolute; left:7px; top:8px; bottom:8px; width:2px; background:var(--td-component-stroke); }
+  .tl-item { position:relative; padding-bottom:16px; }
+  .tl-item:last-child { padding-bottom:2px; }
+  .tl-dot { position:absolute; left:-21px; top:4px; width:10px; height:10px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1.5px var(--td-component-border); }
+  .tl-dot.t-fs { background:var(--td-brand-color); }
+  .tl-dot.t-alert { background:var(--td-warning-color); }
+  .tl-dot.t-event { background:var(--td-error-color); }
+  .tl-dot.t-review { background:var(--td-gray-color-7); }
+  .tl-dot.t-fill { background:var(--td-success-color); }
+  .tl-time { font-size:12px; color:var(--td-text-color-placeholder); font-variant-numeric:tabular-nums; }
+  .tl-title { font-size:13px; font-weight:600; color:var(--td-text-color-primary); display:flex; align-items:center; gap:6px; margin-top:1px; flex-wrap:wrap; }
+  .tl-desc { font-size:12px; color:var(--td-text-color-secondary); line-height:20px; margin-top:2px; }
+
+  /* ===== 快讯体卡片（7.1/7.2 模板） ===== */
+  .flash-card {
+    border:1px solid var(--td-component-stroke); border-left:4px solid var(--td-brand-color);
+    border-radius:6px; padding:14px 16px; margin-bottom:12px; cursor:pointer;
+    font-size:13px; line-height:22px; transition:box-shadow .15s; background:#fff;
+  }
+  .flash-card:hover { box-shadow:var(--td-shadow-2); }
+  .flash-card.lv-event { border-left-color:var(--td-error-color); }
+  .flash-card.lv-intra { border-left-color:var(--td-warning-color); }
+  .flash-card.lv-none { border-left-color:var(--td-gray-color-6); }
+  .fc-title { font-weight:700; font-size:14px; color:var(--td-text-color-primary); }
+  .fc-line { color:var(--td-text-color-primary); margin-top:2px; }
+  .fc-line .lbl { color:var(--td-text-color-secondary); }
+  .fc-src { color:var(--td-text-color-placeholder); }
+  .fc-concl { margin-top:2px; color:var(--td-text-color-primary); }
+  .fc-disc { margin-top:8px; font-size:11px; color:var(--td-text-color-disabled); }
+  .fc-tags { float:right; display:flex; gap:6px; }
+  .verify-flag { font-size:11px; border:1px solid var(--td-warning-color-3); color:var(--td-warning-color); border-radius:3px; padding:0 4px; }
+
+  /* ===== 风险榜（7.5） ===== */
+  .rank-row { display:flex; align-items:center; gap:12px; padding:12px 8px; border-bottom:1px solid var(--td-component-stroke); cursor:pointer; }
+  .rank-row:hover { background:var(--td-bg-color-container-hover); }
+  .rank-row:last-child { border:none; }
+  .rank-no { width:22px; height:22px; border-radius:6px; background:var(--td-bg-color-component); color:var(--td-text-color-secondary); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .rank-no.top { background:var(--td-error-color); color:#fff; }
+  .rank-stock { font-weight:600; font-size:14px; white-space:nowrap; }
+  .rank-code { font-size:11px; color:var(--td-text-color-placeholder); font-weight:400; }
+  .rank-risk { flex:1; font-size:12px; color:var(--td-text-color-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ===== 前瞻日历 ===== */
+  .fs-item { display:flex; gap:14px; padding:14px 8px; border-bottom:1px solid var(--td-component-stroke); cursor:pointer; align-items:center; }
+  .fs-item:hover { background:var(--td-bg-color-container-hover); }
+  .fs-item:last-child { border:none; }
+  .fs-date { width:64px; flex-shrink:0; text-align:center; }
+  .fs-date .d { font-size:20px; font-weight:700; color:var(--td-brand-color); font-variant-numeric:tabular-nums; }
+  .fs-date .t { font-size:11px; color:var(--td-text-color-placeholder); }
+  .fs-body { flex:1; min-width:0; }
+  .fs-title { font-size:14px; font-weight:600; color:var(--td-text-color-primary); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .fs-sum { font-size:12px; color:var(--td-text-color-secondary); margin-top:3px; }
+  .resonance { font-size:11px; background:var(--td-error-color-1); color:var(--td-error-color); border-radius:3px; padding:0 6px; font-weight:600; }
+
+  /* ===== 表格 ===== */
+  table.wt { width:100%; border-collapse:collapse; font-size:14px; }
+  table.wt th { text-align:left; padding:10px 12px; font-size:13px; font-weight:500; color:var(--td-text-color-secondary); background:var(--td-bg-color-secondarycontainer); }
+  table.wt td { padding:12px; border-bottom:1px solid var(--td-component-stroke); color:var(--td-text-color-primary); vertical-align:top; }
+  table.wt tbody tr:hover { background:var(--td-bg-color-container-hover); }
+  table.wt tr.clickable { cursor:pointer; }
+  .num { font-variant-numeric:tabular-nums; text-align:right; }
+  .stk-name { font-weight:600; } .stk-code { font-size:12px; color:var(--td-text-color-placeholder); }
+  .cov-ok { color:var(--td-success-color); font-size:12px; }
+  .cov-none { color:var(--td-warning-color); font-size:12px; font-weight:600; }
+
+  /* ===== 抽屉 ===== */
+  .d-sec { margin-top:20px; }
+  .d-sec-t { font-size:14px; font-weight:600; margin-bottom:10px; color:var(--td-text-color-primary); display:flex; align-items:center; gap:8px; }
+  .fact-row { display:flex; gap:10px; padding:9px 2px; border-bottom:1px solid var(--td-component-stroke); font-size:13px; align-items:baseline; }
+  .fact-row:last-child { border:none; }
+  .fact-src { flex-shrink:0; width:170px; color:var(--td-text-color-secondary); }
+  .fact-date { flex-shrink:0; width:90px; color:var(--td-text-color-placeholder); font-variant-numeric:tabular-nums; }
+  .fact-val { flex:1; color:var(--td-text-color-primary); font-weight:500; }
+  .gate-box { background:var(--td-bg-color-secondarycontainer); border-radius:6px; padding:12px 14px; font-size:13px; line-height:22px; }
+  .sift { display:flex; gap:8px; flex-wrap:wrap; }
+  .sift-item { font-size:12px; background:#e3f9e9; color:var(--td-success-color-6); border-radius:4px; padding:3px 10px; }
+  .sift-item.no { background:var(--td-error-color-1); color:var(--td-error-color); }
+  .scen { border:1px solid var(--td-component-stroke); border-radius:6px; padding:12px 14px; margin-bottom:10px; font-size:13px; line-height:22px; }
+  .scen b { display:block; margin-bottom:4px; }
+  .mono-card { background:#fafbfc; border:1px dashed var(--td-component-border); border-radius:6px; padding:14px 16px; font-size:13px; line-height:23px; white-space:pre-line; }
+
+  /* ===== SOP 页 ===== */
+  .pipe { display:flex; align-items:stretch; gap:6px; flex-wrap:wrap; margin-top:14px; }
+  .pipe-node { flex:1; min-width:150px; background:var(--td-bg-color-secondarycontainer); border-radius:6px; padding:12px; }
+  .pipe-node b { font-size:13px; display:block; margin-bottom:4px; }
+  .pipe-node span { font-size:12px; color:var(--td-text-color-placeholder); line-height:18px; display:block; }
+  .pipe-arrow { align-self:center; color:var(--td-brand-color); font-weight:700; }
+  .redline { display:flex; gap:10px; padding:9px 0; border-bottom:1px dashed var(--td-component-stroke); font-size:13px; line-height:20px; }
+  .redline:last-child { border:none; }
+  .redline i { flex-shrink:0; width:20px; height:20px; border-radius:50%; background:var(--td-error-color); color:#fff; font-style:normal; font-size:12px; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .disc-full { background:var(--td-bg-color-secondarycontainer); border-radius:6px; padding:14px 16px; font-size:12px; line-height:22px; color:var(--td-text-color-secondary); }
+
+  /* ===== 商业模式 ===== */
+  .tier { text-align:center; padding:28px 20px; position:relative; display:flex; flex-direction:column; }
+  .tier.hot { border:2px solid var(--td-brand-color); }
+  .tier-name { font-size:16px; font-weight:600; }
+  .tier-price { font-size:34px; font-weight:700; margin:12px 0 4px; }
+  .tier-price small { font-size:13px; font-weight:400; color:var(--td-text-color-placeholder); }
+  .tier ul { list-style:none; padding:0; margin:18px 0 22px; text-align:left; flex:1; }
+  .tier li { font-size:13px; color:var(--td-text-color-secondary); padding:6px 0 6px 22px; position:relative; }
+  .tier li::before { content:""; position:absolute; left:2px; top:12px; width:6px; height:6px; border-radius:50%; background:var(--td-success-color); }
+  .hot-badge { position:absolute; top:-13px; left:50%; transform:translateX(-50%); }
+  .flywheel { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0; flex-wrap:wrap; }
+  .fw-node { flex:1; min-width:130px; text-align:center; background:var(--td-bg-color-secondarycontainer); border-radius:6px; padding:16px 10px; }
+  .fw-node b { display:block; font-size:14px; margin-bottom:4px; }
+  .fw-node span { font-size:12px; color:var(--td-text-color-placeholder); }
+  .fw-arrow { font-size:18px; color:var(--td-brand-color); font-weight:700; }
+  .biz-note { font-size:13px; color:var(--td-text-color-secondary); line-height:22px; }
+
+  .filter-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .seg { display:inline-flex; background:var(--td-bg-color-component); border-radius:6px; padding:3px; }
+  .seg button { border:none; background:transparent; padding:5px 14px; font-size:13px; cursor:pointer; border-radius:4px; color:var(--td-text-color-secondary); font-family:inherit; }
+  .seg button.on { background:#fff; color:var(--td-brand-color); font-weight:600; box-shadow:var(--td-shadow-1); }
+  .empty-tip { padding:48px 0; text-align:center; color:var(--td-text-color-placeholder); font-size:13px; }
+  .chart-box { width:100%; height:250px; }
+
+  /* ===== 登录页 ===== */
+  .login-wrap { height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(160deg,#eef3ff 0%,#f6f8ff 45%,#e9f7f0 100%); position:relative; overflow:hidden; }
+  .login-wrap::before { content:""; position:absolute; width:420px; height:420px; border-radius:50%; background:rgba(0,82,217,.06); top:-120px; right:-80px; }
+  .login-wrap::after { content:""; position:absolute; width:360px; height:360px; border-radius:50%; background:rgba(7,193,96,.07); bottom:-110px; left:-70px; }
+  .login-card { width:400px; background:#fff; border-radius:12px; box-shadow:var(--td-shadow-3); padding:44px 40px 32px; position:relative; z-index:1; text-align:center; }
+  .login-logo { width:64px; height:64px; margin:0 auto 16px; border-radius:16px; background:linear-gradient(135deg,#366EF4,#0052D9); display:flex; align-items:center; justify-content:center; box-shadow:var(--td-shadow-2); }
+  .login-title { font-size:22px; font-weight:700; color:var(--td-text-color-primary); }
+  .login-sub { font-size:13px; color:var(--td-text-color-placeholder); margin:8px 0 30px; line-height:20px; }
+  .wx-btn { width:100%; height:46px; border:none; border-radius:23px; cursor:pointer; background:#07C160; color:#fff; font-size:16px; font-weight:600; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:10px; transition:background .15s, transform .1s; }
+  .wx-btn:hover { background:#06ad56; } .wx-btn:active { transform:scale(.98); }
+  .wx-btn:disabled { background:#95e0b8; cursor:not-allowed; }
+  .phone-toggle { margin-top:16px; font-size:13px; color:var(--td-text-color-link); cursor:pointer; }
+  .phone-form { margin-top:18px; text-align:left; }
+  .code-row { display:flex; gap:10px; margin-top:10px; }
+  .agree { margin-top:24px; font-size:12px; color:var(--td-text-color-secondary); display:flex; align-items:flex-start; gap:6px; text-align:left; }
+  .agree a { color:var(--td-text-color-link); cursor:pointer; text-decoration:none; }
+  .login-foot { margin-top:22px; font-size:11px; color:var(--td-text-color-disabled); }
+  .auth-mask { position:fixed; inset:0; background:var(--td-mask-active); z-index:3000; display:flex; align-items:flex-end; justify-content:center; }
+  .auth-sheet { width:100%; max-width:420px; background:#fff; border-radius:16px 16px 0 0; padding:24px 24px 34px; animation:sheetUp .28s ease; }
+  @keyframes sheetUp { from { transform:translateY(60%); opacity:.4; } to { transform:none; opacity:1; } }
+  .auth-app { display:flex; align-items:center; gap:10px; padding-bottom:16px; border-bottom:1px solid var(--td-component-stroke); }
+  .auth-app-name { font-size:15px; font-weight:600; }
+  .auth-app-sub { font-size:12px; color:var(--td-text-color-placeholder); }
+  .auth-ask { font-size:13px; color:var(--td-text-color-secondary); margin:18px 0 12px; }
+  .auth-id { display:flex; align-items:center; gap:12px; background:var(--td-bg-color-page); border-radius:10px; padding:12px 14px; }
+  .auth-avatar { width:44px; height:44px; border-radius:8px; background:linear-gradient(135deg,#618dff,#0052D9); color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; }
+  .auth-actions { display:flex; gap:12px; margin-top:22px; }
+  .user-chip { display:flex; align-items:center; gap:8px; padding:4px 10px 4px 4px; border-radius:999px; background:var(--td-bg-color-secondarycontainer); }
+  .user-chip .auth-avatar { width:28px; height:28px; font-size:13px; border-radius:50%; }
+  .user-chip span { font-size:13px; color:var(--td-text-color-primary); }
+
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb { background:var(--td-scrollbar-color); border-radius:4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ============ 登录页 ============ -->
+  <div v-if="!loggedIn" class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-6 4 3 6-8" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="6" r="2.4" fill="#fff"/></svg>
+      </div>
+      <div class="login-title">自选股异动风险提示</div>
+      <div class="login-sub">事前前瞻预警 · 事后事实归因<br>无事实，不归因；只提示波动，不预测涨跌</div>
+      <button class="wx-btn" :disabled="authing" @click="wxLogin">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M9.3 4C5.4 4 2.2 6.7 2.2 10c0 1.9 1 3.5 2.7 4.6l-.7 2.2 2.5-1.3c.6.2 1.3.3 2 .3h.6c-.2-.6-.3-1.2-.3-1.8 0-3.2 3.1-5.7 6.9-5.7h.6C15.9 5.6 12.9 4 9.3 4zM7 7.6c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9zm4.6 0c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9-.9-.4-.9-.9.4-.9.9-.9zM15.9 9.7c-3.4 0-6.1 2.2-6.1 4.9s2.7 4.9 6.1 4.9c.6 0 1.2-.1 1.8-.2l2.1 1.1-.6-1.9c1.5-.9 2.4-2.3 2.4-3.9 0-2.7-2.7-4.9-5.7-4.9zm-2.2 2.2c.4 0 .8.3.8.8 0 .4-.3.8-.8.8s-.8-.3-.8-.8c0-.5.4-.8.8-.8zm4.3 0c.4 0 .8.3.8.8 0 .4-.3.8-.8.8s-.8-.3-.8-.8c0-.5.4-.8.8-.8z" fill="#fff"/></svg>
+        {{ authing ? '正在登录…' : '微信一键登录' }}
+      </button>
+      <div class="phone-toggle" @click="showPhone = !showPhone">{{ showPhone ? '收起' : '手机号快捷登录' }}</div>
+      <div v-if="showPhone" class="phone-form">
+        <t-input v-model="phone" placeholder="请输入手机号" maxlength="11"></t-input>
+        <div class="code-row">
+          <t-input v-model="smsCode" placeholder="验证码" maxlength="6"></t-input>
+          <t-button variant="outline" :disabled="codeTimer > 0" @click="sendCode" style="white-space:nowrap">
+            {{ codeTimer > 0 ? codeTimer + 's 后重发' : '获取验证码' }}
+          </t-button>
+        </div>
+        <t-button theme="primary" block style="margin-top:14px" @click="phoneLogin">登录 / 注册</t-button>
+      </div>
+      <div class="agree">
+        <t-checkbox v-model="agreed" style="margin-top:1px"></t-checkbox>
+        <span>我已阅读并同意<a @click.stop="tipProtocol">《用户协议》</a>与<a @click.stop="tipProtocol">《隐私政策》</a>，并授权本小程序获取我的微信昵称、头像用于登录</span>
+      </div>
+      <div class="login-foot">演示环境 · 不会真实请求微信或发送短信，点击即模拟登录</div>
+    </div>
+  </div>
+
+  <!-- 模拟微信授权弹窗 -->
+  <div v-if="authSheet" class="auth-mask" @click.self="denyAuth">
+    <div class="auth-sheet">
+      <div class="auth-app">
+        <div class="logo-mark" style="width:36px;height:36px;border-radius:9px">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-6 4 3 6-8" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="6" r="2.4" fill="#fff"/></svg>
+        </div>
+        <div>
+          <div class="auth-app-name">自选股异动风险提示</div>
+          <div class="auth-app-sub">微信小程序 · 申请使用</div>
+        </div>
+      </div>
+      <div class="auth-ask">申请获取你的昵称、头像，用于完善账户资料</div>
+      <div class="auth-id">
+        <div class="auth-avatar">微</div>
+        <div>
+          <div style="font-size:14px;font-weight:600">{{ user.name }}</div>
+          <div style="font-size:12px;color:var(--td-text-color-placeholder)">微信头像 · 微信昵称</div>
+        </div>
+        <t-tag theme="success" variant="light" size="small" style="margin-left:auto">已脱敏</t-tag>
+      </div>
+      <div class="auth-actions">
+        <t-button variant="outline" size="large" block @click="denyAuth">拒绝</t-button>
+        <t-button size="large" block style="background:#07C160;border-color:#07C160" :loading="authing" @click="allowAuth">允许</t-button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 主界面 ============ -->
+  <div v-show="loggedIn" class="layout">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-mark">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-6 4 3 6-8" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="6" r="2.4" fill="#fff"/></svg>
+        </div>
+        异动风险提示
+      </div>
+      <nav class="side-menu">
+        <div v-for="m in menus" :key="m.key" class="side-item" :class="{active: activeMenu===m.key}" @click="activeMenu=m.key">
+          <span v-html="m.icon"></span>{{ m.label }}
+          <span v-if="m.key==='alerts' && unread" style="margin-left:auto;background:#D54941;color:#fff;border-radius:999px;font-size:11px;line-height:16px;padding:0 7px;font-weight:600;">{{ unread }}</span>
+        </div>
+      </nav>
+      <div class="side-foot">按 Agent 运行手册（SOP）实现<br>演示数据均为模拟</div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div>
+          <div class="topbar-title">{{ currentMenu.label }}</div>
+          <div class="topbar-sub">{{ currentMenu.sub }}</div>
+        </div>
+        <div class="topbar-right">
+          <span class="live-dot"><i class="pulse"></i>盘中扫描 · 每 5 分钟轮询 {{ stocks.length }} 只标的</span>
+          <span class="clock">{{ nowTime }}</span>
+          <div class="user-chip"><div class="auth-avatar">微</div><span>{{ user.name }}</span></div>
+          <t-button size="small" variant="text" @click="logout">退出</t-button>
+          <t-button theme="primary" @click="simulateScan">模拟一次盘中扫描</t-button>
+        </div>
+      </header>
+
+      <main class="content">
+        <!-- ============ 监测总览 ============ -->
+        <div v-show="activeMenu==='overview'" class="view">
+          <div class="grid kpi-row">
+            <div class="card mkt-card" v-for="m in markets" :key="m.code" @click="openMarket(m)">
+              <div class="kpi-label">{{ m.name }} <span style="color:var(--td-text-color-placeholder)">{{ m.code }}</span></div>
+              <div class="kpi-value" style="font-size:26px">{{ m.value }}</div>
+              <div class="kpi-trend" :class="m.chg>=0?'up':'down'">{{ m.chg>=0?'+':'' }}{{ m.chg.toFixed(2) }}%</div>
+              <div style="font-size:12px;color:var(--td-text-color-placeholder);margin-top:8px;border-top:1px dashed var(--td-component-stroke);padding-top:8px;">
+                自选 {{ m.stocks.length }} 只 · {{ m.stocks.join('、') }} →
+              </div>
+            </div>
+          </div>
+
+          <div class="grid" style="grid-template-columns:1fr 1.6fr; margin-bottom:16px;">
+            <!-- 风险榜 7.5 -->
+            <div class="card">
+              <div class="card-title">自选股风险榜<span class="card-extra">9/12 15:05 更新 · 常驻视图</span></div>
+              <div style="margin-top:6px;">
+                <div v-for="(r,i) in riskBoard" :key="r.code" class="rank-row" @click="openBoardItem(r)">
+                  <span class="rank-no" :class="{top: i<2}">{{ i+1 }}</span>
+                  <span class="rank-stock">{{ r.name }} <span class="rank-code">{{ r.code }}</span></span>
+                  <t-tag :theme="r.level==='高'?'danger':(r.level==='中'?'warning':'default')" variant="light" size="small">{{ r.level }}</t-tag>
+                  <span class="rank-risk">{{ r.risk }}</span>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--td-text-color-disabled);margin-top:10px;">仅列有信号的标的 · 排序：关键信号 &gt; 重要信号 &gt; 参考信号</div>
+            </div>
+            <!-- 日级复盘 7.3 -->
+            <div class="card">
+              <div class="card-title">自选股日报<span class="card-extra">日级复盘 · 15:05 生成</span></div>
+              <div class="mono-card" style="margin-top:12px;">【自选股日报 · 9/12】
+异动 4 只：比亚迪 +2.35%（已归因·事件级）；中芯国际 +5.63%（利好兑现，降级提示）；隆基绿能 -3.15%（已归因·盘中级）；宁德时代 -4.21%（数据背离，需警惕）
+未归因：腾讯控股（行业暂无映射覆盖，归因待补充）
+前瞻 7 日：解禁 1 项（宁德时代 9/18）+ 数据日历 3 项（社零 9/15 · 乘联会零售 9/15 · LPR 9/22）+ 海外 1 项（FOMC 9/17）
+仅供参考，不构成投资建议</div>
+              <div id="chartGate" class="chart-box" style="height:210px;margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <div class="grid" style="grid-template-columns:1.6fr 1fr;">
+            <div class="card">
+              <div class="card-title">最新异动快讯
+                <span class="card-extra" style="color:var(--td-text-color-link);cursor:pointer" @click="activeMenu='alerts'">全部快讯 →</span>
+              </div>
+              <div style="margin-top:12px;">
+                <div v-for="a in alerts.slice(0,2)" :key="a.id" class="flash-card" :class="a.cardCls" @click="openAlert(a)">
+                  <div class="fc-tags">
+                    <t-tag size="small" :theme="a.gateTheme" variant="light">{{ a.gate }}</t-tag>
+                  </div>
+                  <div class="fc-title">{{ a.titleLine }}</div>
+                  <div class="fc-line"><span class="lbl">消息面｜</span><span v-html="a.newsLine"></span></div>
+                  <div class="fc-line"><span class="lbl">技术面｜</span>{{ a.techLine }}</div>
+                  <div class="fc-concl">{{ a.conclusion }}</div>
+                  <div class="fc-disc">仅供参考，不构成投资建议</div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">未来 7 日前瞻日历
+                <span class="card-extra" style="color:var(--td-text-color-link);cursor:pointer" @click="activeMenu='foresight'">全部预警 →</span>
+              </div>
+              <div style="margin-top:4px;">
+                <div v-for="f in foresights.slice(0,4)" :key="f.id" class="fs-item" @click="openForesight(f)">
+                  <div class="fs-date"><div class="d">{{ f.day }}</div><div class="t">{{ f.when }}</div></div>
+                  <div class="fs-body">
+                    <div class="fs-title">{{ f.name }}<t-tag size="small" variant="outline">{{ f.type }}</t-tag>
+                      <span v-if="f.resonance" class="resonance">共振升级</span>
+                    </div>
+                    <div class="fs-sum">{{ f.summary }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ 前瞻预警（2A） ============ -->
+        <div v-show="activeMenu==='foresight'" class="view">
+          <div class="card">
+            <div class="filter-bar">
+              <span style="font-size:13px;color:var(--td-text-color-secondary)">信号类型</span>
+              <div class="seg">
+                <button v-for="t in ['全部','日历事件','趋势事实','技术过热']" :key="t" :class="{on: fsFilter===t}" @click="fsFilter=t">{{ t }}</button>
+              </div>
+              <span style="margin-left:auto;font-size:12px;color:var(--td-text-color-placeholder)">只提示波动可能，不预测方向与幅度 · 同一标的 ≥2 条信号落在 7 日内即共振升级</span>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px;">
+            <div v-if="!filteredForesights.length" class="empty-tip">当前类型暂无前瞻信号</div>
+            <div v-for="f in filteredForesights" :key="f.id" class="fs-item" @click="openForesight(f)">
+              <div class="fs-date"><div class="d">{{ f.day }}</div><div class="t">{{ f.when }}</div></div>
+              <div class="fs-body">
+                <div class="fs-title">
+                  【前瞻 · {{ f.ahead }}】{{ f.name }}({{ f.code }})
+                  <t-tag size="small" variant="outline">{{ f.type }}</t-tag>
+                  <span v-if="f.resonance" class="resonance">时间共振 · 升级一级</span>
+                </div>
+                <div class="fs-sum">{{ f.summary }}<span class="fc-src">（{{ f.source }}）</span>——{{ f.impact }}</div>
+              </div>
+              <t-button size="small" variant="text">情景分支 →</t-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ 异动归因 ============ -->
+        <div v-show="activeMenu==='alerts'" class="view">
+          <div class="card">
+            <div class="filter-bar">
+              <span style="font-size:13px;color:var(--td-text-color-secondary)">核验闸门判定</span>
+              <div class="seg">
+                <button v-for="g in ['全部','事件驱动型','数据印证型','利好兑现型','数据背离型','无事实']" :key="g" :class="{on: gateFilter===g}" @click="gateFilter=g">{{ g }}</button>
+              </div>
+              <span style="margin-left:auto;font-size:12px;color:var(--td-text-color-placeholder)">无事实不归因 · 二手信息带「需核实」标签</span>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px;">
+            <div v-if="!filteredAlerts.length" class="empty-tip">当前判定类型暂无快讯</div>
+            <div v-for="a in filteredAlerts" :key="a.id" class="flash-card" :class="a.cardCls" @click="openAlert(a)">
+              <div class="fc-tags">
+                <t-tag size="small" :theme="a.gateTheme" variant="light">{{ a.gate }}</t-tag>
+                <t-tag size="small" variant="outline">{{ a.time }}</t-tag>
+              </div>
+              <div class="fc-title">{{ a.titleLine }}</div>
+              <template v-if="a.gate !== '无事实'">
+                <div class="fc-line"><span class="lbl">消息面｜</span><span v-html="a.newsLine"></span></div>
+                <div class="fc-line"><span class="lbl">技术面｜</span>{{ a.techLine }}</div>
+                <div class="fc-concl">{{ a.conclusion }}</div>
+              </template>
+              <div v-else class="fc-concl">{{ a.conclusion }}</div>
+              <div class="fc-disc">仅供参考，不构成投资建议</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ 自选股 ============ -->
+        <div v-show="activeMenu==='watchlist'" class="view">
+          <div class="card">
+            <div class="filter-bar">
+              <span style="font-size:13px;color:var(--td-text-color-secondary)">所属市场</span>
+              <div class="seg">
+                <button v-for="mk in ['全部','沪市主板','深市主板','创业板','科创板','港股']" :key="mk" :class="{on: marketFilter===mk}" @click="marketFilter=mk">{{ mk }}</button>
+              </div>
+              <span style="margin-left:auto;font-size:12px;color:var(--td-text-color-placeholder)">点击行查看该股的异动时间线</span>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px;">
+            <div class="card-title">自选股与风险信号比对集合<span class="card-extra">每只标的入库即构建：利空清单 + 宏观数据清单（按行业映射）+ 高频信号 + 技术面信号</span></div>
+            <table class="wt" style="margin-top:12px;">
+              <thead><tr>
+                <th>标的</th><th>市场</th><th>行业标签（映射表）</th><th class="num">最新价</th><th class="num">涨跌幅</th>
+                <th>核心监控数据</th><th>比对集合覆盖</th><th style="text-align:center">监控</th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="s in filteredStocks" :key="s.code" class="clickable" @click="openStock(s)">
+                  <td><div class="stk-name">{{ s.name }}</div><div class="stk-code">{{ s.code }}</div></td>
+                  <td><t-tag size="small" variant="outline">{{ s.market }}</t-tag></td>
+                  <td><t-tag size="small" variant="light" :theme="s.covered?'primary':'warning'">{{ s.industry }}</t-tag></td>
+                  <td class="num">{{ s.price.toFixed(2) }}</td>
+                  <td class="num" :class="s.chg>=0?'up':'down'">{{ s.chg>=0?'+':'' }}{{ s.chg.toFixed(2) }}%</td>
+                  <td style="font-size:12px;color:var(--td-text-color-secondary);max-width:260px">{{ s.watchData }}</td>
+                  <td><span :class="s.covered?'cov-ok':'cov-none'">{{ s.covered ? '✓ 已覆盖' : '⚠ 暂无覆盖（显式标记）' }}</span></td>
+                  <td style="text-align:center" @click.stop><t-switch v-model="s.monitoring" size="small"></t-switch></td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="!filteredStocks.length" class="empty-tip">该市场下暂无自选标的</div>
+          </div>
+        </div>
+
+        <!-- ============ 商业模式 ============ -->
+        <div v-show="activeMenu==='business'" class="view">
+          <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;">
+            <div class="card tier" v-for="t in tiers" :key="t.name" :class="{hot:t.hot}">
+              <t-tag v-if="t.hot" class="hot-badge" theme="primary">最受欢迎</t-tag>
+              <div class="tier-name">{{ t.name }}</div>
+              <div class="tier-price">{{ t.price }}<small>{{ t.unit }}</small></div>
+              <div style="font-size:12px;color:var(--td-text-color-placeholder)">{{ t.desc }}</div>
+              <ul><li v-for="f in t.features" :key="f">{{ f }}</li></ul>
+              <t-button :theme="t.hot?'primary':'default'" variant="base" block>{{ t.cta }}</t-button>
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns:1.2fr 1fr;">
+            <div class="card">
+              <div class="card-title">数据飞轮：越用越准的核验闸门</div>
+              <div class="flywheel" style="margin-top:16px;">
+                <div class="fw-node"><b>用户自选池</b><span>真实关注标的+行业标签</span></div><span class="fw-arrow">→</span>
+                <div class="fw-node"><b>前瞻+归因推送</b><span>SOP 规则化产出</span></div><span class="fw-arrow">→</span>
+                <div class="fw-node"><b>采纳/误报反馈</b><span>闸门判定准确率回流</span></div><span class="fw-arrow">→</span>
+                <div class="fw-node"><b>阈值与映射迭代</b><span>个性化信号集合进化</span></div><span class="fw-arrow">↺</span>
+              </div>
+              <p class="biz-note" style="margin-top:14px;">"无事实不归因"的克制是信任来源：用户对"不推送"的满意度同样是训练信号，闸门误报率持续下降构成效果壁垒。</p>
+            </div>
+            <div class="card">
+              <div class="card-title">变现路径与单位经济</div>
+              <div style="margin-top:12px;">
+                <div class="fact-row"><span style="flex:1;color:var(--td-text-color-secondary)">免费层转化目标</span><b>12% → Pro</b></div>
+                <div class="fact-row"><span style="flex:1;color:var(--td-text-color-secondary)">Pro 年费 ARPU</span><b>¥365/年</b></div>
+                <div class="fact-row"><span style="flex:1;color:var(--td-text-color-secondary)">机构版（券商/私募 API）</span><b>按席位计费</b></div>
+                <div class="fact-row"><span style="flex:1;color:var(--td-text-color-secondary)">前瞻日历数据产品</span><b>B 端授权</b></div>
+                <div class="fact-row"><span style="flex:1;color:var(--td-text-color-secondary)">单标的事实核验成本</span><b class="down">&lt; ¥0.1/日</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 异动归因详情抽屉 -->
+  <t-drawer v-model:visible="alertDrawer" :header="null" size="480px" :footer="false">
+    <div v-if="curAlert">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <t-tag :theme="curAlert.gateTheme" variant="dark">{{ curAlert.gate }}</t-tag>
+        <t-tag variant="outline">{{ curAlert.level }}</t-tag>
+        <span style="font-size:12px;color:var(--td-text-color-placeholder)">{{ curAlert.time }}</span>
+      </div>
+      <div class="mono-card" style="margin-top:14px;">{{ curAlert.fullText }}</div>
+
+      <template v-if="curAlert.facts.length">
+        <div class="d-sec">
+          <div class="d-sec-t">事实三元组（来源 + 时点 + 数值）</div>
+          <div class="fact-row" v-for="(f,i) in curAlert.facts" :key="i">
+            <span class="fact-src">{{ f.src }}<span v-if="f.second" class="verify-flag" style="margin-left:4px">需核实</span></span>
+            <span class="fact-date">{{ f.date }}</span>
+            <span class="fact-val">{{ f.val }}</span>
+          </div>
+        </div>
+        <div class="d-sec">
+          <div class="d-sec-t">相关性三重初筛</div>
+          <div class="sift">
+            <span class="sift-item">✓ 时间相关：30 天窗口内</span>
+            <span class="sift-item">✓ 对象相关：主营行业命中</span>
+            <span class="sift-item" :class="{no: curAlert.gate==='数据背离型'}">{{ curAlert.gate==='数据背离型' ? '✗ 方向背离（有效信号，降级）' : '✓ 方向一致' }}</span>
+          </div>
+        </div>
+        <div class="d-sec">
+          <div class="d-sec-t">核验闸门说明</div>
+          <div class="gate-box">{{ curAlert.gateNote }}</div>
+        </div>
+      </template>
+      <div v-else class="d-sec">
+        <div class="d-sec-t">闸门拦截说明</div>
+        <div class="gate-box">{{ curAlert.gateNote }}</div>
+      </div>
+
+      <div class="d-sec" style="display:flex;gap:10px;">
+        <t-button theme="primary" block @click="feedback(true)">✓ 推送有用</t-button>
+        <t-button variant="outline" block @click="feedback(false)">误报，优化闸门</t-button>
+      </div>
+    </div>
+  </t-drawer>
+
+  <!-- 前瞻情景抽屉（2A-1） -->
+  <t-drawer v-model:visible="fsDrawer" :header="null" size="480px" :footer="false">
+    <div v-if="curFs">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <t-tag theme="primary" variant="dark">前瞻 · {{ curFs.ahead }}</t-tag>
+        <t-tag variant="outline">{{ curFs.type }}</t-tag>
+        <span v-if="curFs.resonance" class="resonance">时间共振 · 升级一级</span>
+      </div>
+      <h3 style="margin:14px 0 4px;font-size:17px;">{{ curFs.name }}（{{ curFs.code }}）</h3>
+      <div style="font-size:13px;color:var(--td-text-color-secondary)">{{ curFs.summary }}（{{ curFs.source }}）<br>时间 {{ curFs.date }}</div>
+
+      <div class="d-sec">
+        <div class="d-sec-t">情景化前瞻（预置分支 · 落地后回填）</div>
+        <div class="gate-box" style="margin-bottom:10px;">预期：{{ curFs.expect }}</div>
+        <div class="scen" v-for="sc in curFs.scenarios" :key="sc.k">
+          <b :style="{color: sc.color}">若{{ sc.k }} →</b>
+          {{ sc.v }}
+        </div>
+        <div style="font-size:12px;color:var(--td-text-color-placeholder);line-height:20px;">情景分档只写条件与传导路径，不预测哪一档会发生；事件落地后按实际值对照回填，转为事实归因卡并回链"此前已前瞻"。</div>
+      </div>
+      <div class="d-sec">
+        <t-button theme="primary" variant="light" block @click="fsDrawer=false">已了解，纳入 7 日监控</t-button>
+      </div>
+      <div class="fc-disc" style="margin-top:12px;">仅供参考，不构成投资建议</div>
+    </div>
+  </t-drawer>
+
+  <!-- 个股详情：异动时间线 -->
+  <t-dialog v-model:visible="stockDialog" :header="curStock ? curStock.name + '（' + curStock.code + '）· 异动时间线' : ''" width="620px" :footer="false">
+    <div v-if="curStock">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:26px;font-weight:700">{{ curStock.price.toFixed(2) }}</span>
+        <b :class="curStock.chg>=0?'up':'down'" style="font-size:15px">{{ curStock.chg>=0?'+':'' }}{{ curStock.chg.toFixed(2) }}%</b>
+        <t-tag size="small" variant="outline">{{ curStock.market }}</t-tag>
+        <t-tag size="small" :theme="curStock.covered?'primary':'warning'" variant="light">{{ curStock.industry }}</t-tag>
+      </div>
+      <div class="d-sec">
+        <div class="d-sec-t">异动时间线<span style="font-size:11px;color:var(--td-text-color-placeholder);font-weight:400">前瞻 → 异动 → 归因 → 复盘，全链路留痕</span></div>
+        <div class="tl">
+          <div class="tl-item" v-for="(e,i) in curTimeline" :key="i">
+            <span class="tl-dot" :class="e.dot"></span>
+            <div class="tl-time">{{ e.time }}</div>
+            <div class="tl-title">{{ e.title }}
+              <t-tag v-if="e.tag" size="small" :theme="e.tagTheme" variant="light">{{ e.tag }}</t-tag>
+            </div>
+            <div class="tl-desc">{{ e.desc }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="d-sec">
+        <div class="d-sec-t">风险信号比对集合（四部分）</div>
+        <div class="gate-box" style="white-space:pre-line;">{{ curStock.setDetail }}</div>
+      </div>
+      <div class="d-sec" style="display:flex;gap:10px;">
+        <t-button theme="primary" variant="light" block @click="stockDialog=false;gateFilter='全部';activeMenu='alerts'">查看该标的快讯</t-button>
+        <t-button variant="outline" block @click="stockDialog=false">关闭</t-button>
+      </div>
+    </div>
+  </t-dialog>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+const ICONS = {
+  dash: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="8" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="3" width="8" height="5" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="10" width="8" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="13" width="8" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/></svg>',
+  cal: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  bolt: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  star: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.7 5.7 6.3.8-4.6 4.3 1.2 6.2-5.6-3-5.6 3 1.2-6.2L3 9.5l6.3-.8L12 3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  coin: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 9.5L12 14l3.5-4.5M12 14v4M9 12h6M9 15h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+};
+
+// ===== 异动归因快讯（模板 7.1 / 7.2） =====
+const ALERTS = [
+  { id:1, level:'事件级', cardCls:'lv-event', gate:'事件驱动型', gateTheme:'danger', time:'9/12 10:12',
+    name:'比亚迪', code:'002594', chg:2.35,
+    titleLine:'【异动 · 事件级】比亚迪(002594) +2.35%，量比 1.8',
+    newsLine:'披露 8 月新能源车销量 37.3 万辆，同比 +21%<span class="fc-src">（公司公告 9/11）</span>',
+    techLine:'90日价格分位 61%（截至 9/12 盘中）',
+    conclusion:'销量数据落地与公告直接对应，归因可信度高',
+    facts:[ {src:'公司公告（S1）', date:'2026-09-11', val:'8月销量 37.3万辆，同比+21%'} ],
+    gateNote:'异动与同日公告直接对应 → 事件级推送。公告为 S1 一手来源，直接采信，三元组完整。',
+    fullText:'【异动 · 事件级】比亚迪(002594) +2.35%，量比 1.8\n消息面｜披露 8 月新能源车销量 37.3 万辆，同比 +21%（公司公告 9/11）\n技术面｜90日价格分位 61%（截至 9/12 盘中）\n销量数据落地与公告直接对应，归因可信度高\n仅供参考，不构成投资建议' },
+  { id:2, level:'盘中级', cardCls:'lv-intra', gate:'利好兑现型', gateTheme:'warning', time:'9/12 09:47',
+    name:'中芯国际', code:'688981', chg:5.63,
+    titleLine:'【异动 · 盘中级】中芯国际(688981) +5.63%，量比 2.8',
+    newsLine:'7月全球半导体销售额同比 +18%<span class="fc-src">（SIA 9/5，已发布 7 日）</span>；大基金注资传闻<span class="fc-src">（财经媒体，需核实）</span>',
+    techLine:'90日价格分位 92%，换手率处 90 日高分位（截至 9/12 收盘）',
+    conclusion:'利好数据已发布多日且无新增事实，属情绪补涨，高位放量需留意',
+    facts:[ {src:'SIA（S2）', date:'2026-09-05', val:'7月全球销售额同比+18%（发布已7日）'},
+            {src:'财经媒体（S5）', date:'2026-09-12', val:'大基金三期注资传闻', second:true} ],
+    gateNote:'对应利好数据发布已 ≥3 个交易日、当日无新增一手事实 → 降级提示"情绪补涨"，不做归因背书。S5 传闻带「需核实」，不得单独支撑归因。高位（分位≥90%）放量，额外提示出货风险。',
+    fullText:'【异动 · 盘中级】中芯国际(688981) +5.63%，量比 2.8\n消息面｜7月全球半导体销售额同比 +18%（SIA 9/5，已发布 7 日）；大基金注资传闻（财经媒体，需核实）\n技术面｜90日价格分位 92%，换手率处 90 日高分位\n利好数据已发布多日且无新增事实，属情绪补涨，高位放量需留意\n仅供参考，不构成投资建议' },
+  { id:3, level:'盘中级', cardCls:'lv-intra', gate:'数据印证型', gateTheme:'primary', time:'9/12 14:05',
+    name:'隆基绿能', code:'601012', chg:-3.15,
+    titleLine:'【异动 · 盘中级】隆基绿能(601012) -3.15%，量比 2.1',
+    newsLine:'8月新增光伏装机同比 -12%<span class="fc-src">（国家能源局 9/10）</span>；组件价格周跌 2.1%<span class="fc-src">（PVInfoLink 9/11）</span>',
+    techLine:'90日价格分位 24%，量比 2.1（截至 9/12 盘中）',
+    conclusion:'装机需求走弱叠加组件跌价，盈利预期面临下修',
+    facts:[ {src:'国家能源局（S2）', date:'2026-09-10', val:'8月新增装机同比 -12%'},
+            {src:'PVInfoLink（S4）', date:'2026-09-11', val:'组件价格周跌 2.1%'} ],
+    gateNote:'异动方向与近 30 天权威数据同向 → 数据印证型，写出传导链：装机走弱→需求端承压，组件跌价→单价端承压，双压指向盈利预期。',
+    fullText:'【异动 · 盘中级】隆基绿能(601012) -3.15%，量比 2.1\n消息面｜8月新增光伏装机同比 -12%（国家能源局 9/10）；组件价格周跌 2.1%（PVInfoLink 9/11）\n技术面｜90日价格分位 24%，量比 2.1\n装机需求走弱叠加组件跌价，盈利预期面临下修\n仅供参考，不构成投资建议' },
+  { id:4, level:'盘中级', cardCls:'lv-intra', gate:'数据背离型', gateTheme:'warning', time:'9/12 14:32',
+    name:'宁德时代', code:'300750', chg:-4.21,
+    titleLine:'【异动 · 盘中级】宁德时代(300750) -4.21%，量比 3.1',
+    newsLine:'8月动力电池装车量同比 +32%<span class="fc-src">（电池联盟 9/10）</span>；碳酸锂周跌 3.2%<span class="fc-src">（SMM 9/11）</span>',
+    techLine:'90日价格分位 18%，量比 3.1（截至 9/12 盘中）',
+    conclusion:'股价下行与行业量价事实背离，需警惕数据消化不足或其他驱动',
+    facts:[ {src:'动力电池产业创新联盟（S3）', date:'2026-09-10', val:'8月装车量同比 +32%'},
+            {src:'SMM（S4）', date:'2026-09-11', val:'碳酸锂周跌 3.2%（成本端利好）'} ],
+    gateNote:'异动方向与权威数据相反 → 背离本身仍是有效信号，降一级处理并说明不确定性：可能存在资金面等其他驱动，9/18 解禁临近已同步前瞻预警。',
+    fullText:'【异动 · 盘中级】宁德时代(300750) -4.21%，量比 3.1\n消息面｜8月动力电池装车量同比 +32%（电池联盟 9/10）；碳酸锂周跌 3.2%（SMM 9/11）\n技术面｜90日价格分位 18%，量比 3.1\n股价下行与行业量价事实背离，需警惕数据消化不足或其他驱动\n仅供参考，不构成投资建议' },
+  { id:5, level:'盘中级', cardCls:'lv-none', gate:'无事实', gateTheme:'default', time:'9/12 11:20',
+    name:'腾讯控股', code:'00700', chg:0.92,
+    titleLine:'【异动】腾讯控股(00700) +0.92%，量比 1.3',
+    newsLine:'', techLine:'',
+    conclusion:'触发港股 ±3% 阈值边缘监控，所属行业暂无映射覆盖，30 天内无可溯源权威数据，仅报异动，不归因',
+    facts:[],
+    gateNote:'互联网行业不在第 4 节映射表内 → 显式标记「暂无覆盖」，不用相近行业数据冒充；30 天窗口内未提取到完整三元组事实 → 闸门拦截，只报异动。',
+    fullText:'【异动】腾讯控股(00700) +0.92%，量比 1.3\n触发港股 ±3% 阈值边缘监控，所属行业暂无映射覆盖，30 天内无可溯源权威数据，仅报异动，不归因\n仅供参考，不构成投资建议' }
+];
+
+// ===== 前瞻预警（2A / 模板 7.4） =====
+const FORESIGHTS = [
+  { id:1, day:'9/18', date:'2026-09-18', when:'前 6 日', ahead:'前 6 日', type:'日历事件', resonance:true,
+    name:'宁德时代', code:'300750', source:'交易所披露',
+    summary:'9/18 解禁 1.2 亿股，占总股本 2.7%', impact:'流通盘增加，留意集中抛压',
+    expect:'解禁规模占流通盘 2.8%，历史同类解禁首周平均换手放大 1.6 倍（交易所披露统计）',
+    scenarios:[
+      {k:'伴随大额减持公告', v:'经 股东减持→可售供给骤增→二级承接承压 传导 → 影响流动性一端，波动可能放大', color:'#D54941'},
+      {k:'无减持、平稳解禁', v:'供给冲击通常已被提前定价，波动有限，留意解禁日前后换手率是否异常放大', color:'#E37318'},
+      {k:'股东承诺延长锁定', v:'经 供给预期收敛→抛压解除 传导 → 前期压制的估值端修复', color:'#2BA471'} ] },
+  { id:2, day:'9/15', date:'2026-09-15', when:'前 3 日', ahead:'前 3 日', type:'日历事件', resonance:false,
+    name:'贵州茅台', code:'600519', source:'国家统计局发布日历',
+    summary:'9/15 发布 8 月社零（烟酒类分项）', impact:'需求端量价校验窗口',
+    expect:'市场一致预期烟酒类零售同比 +2.5%（Wind 一致预期）；前值 +1.8%（统计局 8/15）',
+    scenarios:[
+      {k:'高于预期', v:'经 社零走强→白酒需求预期上修→渠道信心恢复 传导 → 影响需求一端', color:'#2BA471'},
+      {k:'符合预期', v:'通常已被定价，波动有限，留意批价等高频数据的边际变化', color:'#E37318'},
+      {k:'低于预期', v:'经 零售走弱→需求疲弱确认→盈利预期下修 传导 → 影响需求一端；烟酒类已连续 2 期走弱，若再低预期则趋势确认', color:'#D54941'} ] },
+  { id:3, day:'9/15', date:'2026-09-15', when:'前 3 日', ahead:'前 3 日', type:'日历事件', resonance:false,
+    name:'比亚迪', code:'002594', source:'乘联会发布日历',
+    summary:'9/15 发布 8 月乘用车零售与新能源渗透率', impact:'零售弱于批发则留意渠道库存',
+    expect:'市场一致预期新能源零售渗透率 54%（乘联会口径前值 53.2%）',
+    scenarios:[
+      {k:'高于预期', v:'经 渗透率上行→行业总量逻辑强化→头部份额集中 传导 → 影响需求一端', color:'#2BA471'},
+      {k:'符合预期', v:'通常已被定价，波动有限，留意零售与批发增速差', color:'#E37318'},
+      {k:'低于预期', v:'经 零售弱于批发→渠道库存累积→价格竞争加剧 传导 → 影响盈利一端', color:'#D54941'} ] },
+  { id:4, day:'9/17', date:'2026-09-17', when:'前 5 日', ahead:'前 5 日', type:'日历事件', resonance:false,
+    name:'全局环境信号', code:'FOMC', source:'美联储议息日历',
+    summary:'9/17 美联储议息决议', impact:'高估值成长与外资重仓股估值端承压',
+    expect:'CME 利率期货隐含降息 25bp 概率 78%（9/12 收盘）',
+    scenarios:[
+      {k:'降息且指引鸽派', v:'经 贴现率下行→成长估值端修复→外资风险偏好回升 传导 → 影响估值一端', color:'#2BA471'},
+      {k:'降息但指引鹰派', v:'利多落地但路径不明，波动可能放大，留意 10Y 美债收益率走向', color:'#E37318'},
+      {k:'按兵不动', v:'经 降息预期落空→紧缩预期重定价→高估值板块承压 传导 → 影响估值与流动性一端', color:'#D54941'} ] },
+  { id:5, day:'9/22', date:'2026-09-22', when:'前 10 日', ahead:'前 10 日', type:'日历事件', resonance:false,
+    name:'招商银行', code:'600036', source:'全国银行间同业拆借中心',
+    summary:'9/22 LPR 报价', impact:'若下调 → 净息差压缩 → 盈利端',
+    expect:'市场一致预期 1Y/5Y LPR 持平（3.0%/3.5%）；零售贷款占比高，对 5Y LPR 敏感度居股份行首位',
+    scenarios:[
+      {k:'下调 5Y LPR', v:'经 贷款利率下行→净息差收窄→利息净收入承压 传导 → 影响盈利一端', color:'#D54941'},
+      {k:'持平', v:'符合预期，波动有限，留意存量房贷利率政策表态', color:'#E37318'} ] },
+  { id:6, day:'确认中', date:'2026-09-12', when:'趋势', ahead:'趋势', type:'趋势事实', resonance:true,
+    name:'隆基绿能', code:'601012', source:'国家能源局 + PVInfoLink',
+    summary:'新增装机同比转负 + 组件价格连续 3 周下行', impact:'需求与单价双弱的事实趋势',
+    expect:'趋势类信号为已发生事实：装机 -12%（9/10）、组件周跌 2.1%（9/11），连续 2 期走弱',
+    scenarios:[
+      {k:'趋势延续', v:'需求与单价双弱持续 → 盈利预期进一步下修，波动可能延续（只描述事实趋势，不预测时点）', color:'#D54941'},
+      {k:'价格止跌', v:'产业链价格企稳 → 留意盈利预期是否阶段性见底，等待新一期数据确认', color:'#E37318'} ] },
+  { id:7, day:'9/12', date:'2026-09-12', when:'过热', ahead:'过热', type:'技术过热', resonance:false,
+    name:'中芯国际', code:'688981', source:'交易所行情 + 既定算法（截至 9/12 收盘）',
+    summary:'90日价格分位 92% + 换手率处 90 日高分位', impact:'高位高换手，回撤风险累积',
+    expect:'计算型事实：90日价格分位 92%（≥90% 为高位阈值）、换手率 90 日分位 95%、融资余额单周 +18%',
+    scenarios:[
+      {k:'叠加利空出现', v:'高位 + 放量 + 利空 → 升级提示，典型情绪透支形态（不预测时点与幅度）', color:'#D54941'},
+      {k:'量能回落', v:'换手分位下降 → 过热信号自然解除，仅作背景记录', color:'#E37318'} ] }
+];
+
+// ===== 自选股（含比对集合覆盖状态） =====
+const STOCKS = [
+  { name:'宁德时代', code:'300750', market:'创业板', industry:'新能源车/锂电', covered:true, price:186.45, chg:-4.21, monitoring:true,
+    watchData:'产销（中汽协 S3）· 装车量（电池联盟 S3）· 碳酸锂价（SMM S4）',
+    setDetail:'① 利空清单：解禁 9/18 已入前瞻日历（重要）\n② 宏观清单：装车量同比（关键）· 碳酸锂价（重要）· 产销增速（关键）\n③ 高频信号：锂电板块同行异动（重要）\n④ 技术面：90日价格分位 18%，量比 3.1（低位放量，仅描述）' },
+  { name:'贵州茅台', code:'600519', market:'沪市主板', industry:'白酒/消费', covered:true, price:1526.00, chg:1.08, monitoring:true,
+    watchData:'社零烟酒类（统计局 S2）· CPI 烟酒分项（统计局 S2）· 飞天批价（渠道 S5·需核实）',
+    setDetail:'① 利空清单：无新增重大事项\n② 宏观清单：社零烟酒类同比（参考，间接滞后）· 9/15 数据发布已入前瞻\n③ 高频信号：飞天批价 2,680 元持平（S5 需核实）\n④ 技术面：90日价格分位 55%，量能正常' },
+  { name:'中芯国际', code:'688981', market:'科创板', industry:'半导体', covered:true, price:92.36, chg:5.63, monitoring:true,
+    watchData:'全球销售额（SIA S2）· 设备 B/B 值（SEMI S2）· 存储合约价（TrendForce S4）',
+    setDetail:'① 利空清单：无新增重大事项\n② 宏观清单：全球销售额同比（关键）· 设备出货（重要）\n③ 高频信号：大基金注资传闻（S5 需核实，降半级）\n④ 技术面：90日价格分位 92% + 换手高分位（重要，技术过热已前瞻）' },
+  { name:'比亚迪', code:'002594', market:'深市主板', industry:'新能源车/锂电', covered:true, price:258.80, chg:2.35, monitoring:true,
+    watchData:'产销（中汽协 S3）· 零售渗透率（乘联会 S3）· 9/15 零售数据已入前瞻',
+    setDetail:'① 利空清单：无新增重大事项\n② 宏观清单：产销同比（关键）· 渗透率（重要）\n③ 高频信号：新车型订单舆情（S5 需核实）\n④ 技术面：90日价格分位 61%，量比 1.8' },
+  { name:'招商银行', code:'600036', market:'沪市主板', industry:'银行/金融', covered:true, price:34.52, chg:-0.86, monitoring:true,
+    watchData:'LPR（央行 S2·关键）· 社融/M2（央行 S2）· 净息差（金融监管总局 S2）',
+    setDetail:'① 利空清单：无新增重大事项\n② 宏观清单：LPR 报价（关键，9/22 已入前瞻）· 社融信贷（关键）\n③ 高频信号：无\n④ 技术面：PB 0.82×，处历史 15% 分位（参考）' },
+  { name:'隆基绿能', code:'601012', market:'沪市主板', industry:'光伏/电力', covered:true, price:18.24, chg:-3.15, monitoring:true,
+    watchData:'新增装机（能源局 S2·关键）· 硅料/组件价（PVInfoLink·SMM S4·重要）',
+    setDetail:'① 利空清单：无新增重大事项\n② 宏观清单：装机同比转负（关键，趋势已确认）· 组件价格连降（重要）\n③ 高频信号：板块资金连续流出（参考）\n④ 技术面：90日价格分位 24%，低位放量（仅描述不预测）' },
+  { name:'腾讯控股', code:'00700', market:'港股', industry:'互联网（暂无覆盖）', covered:false, price:418.20, chg:0.92, monitoring:true,
+    watchData:'行业未列入映射表 → 仅监控行情面阈值与 S1 公告事件',
+    setDetail:'⚠ 行业暂无映射覆盖（显式标记，不用相近行业冒充）\n① 利空清单：照常监控（公告/减持/问询，S1）\n② 宏观清单：暂无覆盖\n③ 高频信号：仅 S1 公告\n④ 技术面：90日价格分位 58%，量能正常' },
+  { name:'美团-W', code:'03690', market:'港股', industry:'互联网（暂无覆盖）', covered:false, price:128.60, chg:-1.94, monitoring:true,
+    watchData:'行业未列入映射表 → 仅监控行情面阈值与 S1 公告事件',
+    setDetail:'⚠ 行业暂无映射覆盖（显式标记）\n① 利空清单：照常监控（公告/减持，S1）\n② 宏观清单：暂无覆盖\n③ 高频信号：仅 S1 公告\n④ 技术面：沽空比例 12.8%（S6 资金行为，参考）' }
+];
+
+const RISK_BOARD = [
+  { name:'宁德时代', code:'300750', level:'高', risk:'解禁临近叠加股价与行业事实背离', link:{kind:'fs', id:1} },
+  { name:'中芯国际', code:'688981', level:'高', risk:'技术过热 + 利好兑现，情绪补涨', link:{kind:'alert', id:2} },
+  { name:'隆基绿能', code:'601012', level:'中', risk:'装机走弱 + 组件跌价，趋势确认', link:{kind:'alert', id:3} },
+  { name:'贵州茅台', code:'600519', level:'中', risk:'社零数据发布临近，留意需求走弱', link:{kind:'fs', id:2} },
+  { name:'招商银行', code:'600036', level:'低', risk:'LPR 窗口临近（9/22）', link:{kind:'fs', id:5} }
+];
+
+// ===== 市场板块（与自选股一一对应） =====
+const MARKETS = [
+  { name:'上证指数', code:'000001.SH', value:'3,842.16', chg:-0.42, filters:['沪市主板'], stocks:['贵州茅台','招商银行','隆基绿能'] },
+  { name:'深证成指', code:'399001.SZ', value:'12,586.30', chg:0.68, filters:['深市主板','创业板'], stocks:['比亚迪','宁德时代'] },
+  { name:'科创 50', code:'000688.SH', value:'1,024.55', chg:2.15, filters:['科创板'], stocks:['中芯国际'] },
+  { name:'恒生指数', code:'HSI.HK', value:'19,854.20', chg:-0.35, filters:['港股'], stocks:['腾讯控股','美团-W'] }
+];
+
+// ===== 个股异动时间线（前瞻 → 异动 → 归因 → 复盘 → 回填） =====
+const TIMELINES = {
+  '300750': [
+    { time:'9/08 盘前 8:30', dot:'t-fs', title:'前瞻预警生成', tag:'日历事件', tagTheme:'primary',
+      desc:'解禁日历命中：9/18 解禁 1.2 亿股占总股本 2.7%（交易所披露），纳入 7 日前瞻监控。' },
+    { time:'9/10 盘后', dot:'t-fs', title:'行业数据入集合', tag:'趋势事实', tagTheme:'primary',
+      desc:'8月动力电池装车量同比 +32%（电池联盟 9/10）；碳酸锂周跌 3.2%（SMM 9/11）。' },
+    { time:'9/12 14:32', dot:'t-alert', title:'盘中扫描命中', tag:'异动 · 盘中级', tagTheme:'warning',
+      desc:'跌幅 -4.21% 触发 A股 ±4% 阈值，量比 3.1 ≥ 2.0，进入识别与提取流程。' },
+    { time:'9/12 14:35', dot:'t-alert', title:'闸门判定：数据背离型', tag:'降级提示', tagTheme:'warning',
+      desc:'股价下行与行业量价事实方向相反，降一级推送并说明不确定性；与 9/18 解禁前瞻形成时间共振。' },
+    { time:'9/12 15:05', dot:'t-review', title:'日级复盘收录', tag:'日报', tagTheme:'default',
+      desc:'收录于【自选股日报 · 9/12】，标注"数据背离，需警惕"；风险榜升至第 1 位。' },
+    { time:'9/18 待落地', dot:'t-fill', title:'解禁落地 → 回填', tag:'待回填', tagTheme:'success',
+      desc:'到期后按实际减持情况对照预置情景分支，转为事实归因卡并回链"此前已前瞻"。' }
+  ],
+  '600519': [
+    { time:'8/15 盘后', dot:'t-fs', title:'宏观数据入集合', tag:'参考级', tagTheme:'default',
+      desc:'7月社零烟酒类同比 +1.8%（统计局 8/15），连续 2 期走弱，标记为趋势观察项。' },
+    { time:'9/12 盘前 8:30', dot:'t-fs', title:'前瞻预警生成', tag:'日历事件', tagTheme:'primary',
+      desc:'9/15 社零发布进入前 3 日窗口，预置三档情景分支（高于/符合/低于一致预期 +2.5%）。' },
+    { time:'9/12 15:05', dot:'t-review', title:'日级复盘收录', tag:'日报', tagTheme:'default',
+      desc:'当日 +1.08% 未触发阈值，无盘中异动；风险榜第 4 位（中）。' },
+    { time:'9/15 10:00 待落地', dot:'t-fill', title:'社零发布 → 回填', tag:'待回填', tagTheme:'success',
+      desc:'实际值公布后对照情景分档判定，转为事实归因卡。' }
+  ],
+  '688981': [
+    { time:'9/05 盘后', dot:'t-fs', title:'宏观数据入集合', tag:'关键', tagTheme:'danger',
+      desc:'7月全球半导体销售额同比 +18%（SIA 9/5），行业需求端量数据，直接采信。' },
+    { time:'9/12 09:47', dot:'t-alert', title:'盘中扫描命中', tag:'异动 · 盘中级', tagTheme:'warning',
+      desc:'涨幅 +5.63% 触发阈值，量比 2.8；S5 渠道传来大基金注资传闻（带「需核实」标签）。' },
+    { time:'9/12 09:50', dot:'t-alert', title:'闸门判定：利好兑现型', tag:'不做归因背书', tagTheme:'warning',
+      desc:'对应利好数据发布已 7 日、当日无新增一手事实 → 降级为"情绪补涨"提示；传闻不得单独支撑归因。' },
+    { time:'9/12 收盘后', dot:'t-fs', title:'技术过热前瞻生成', tag:'技术过热', tagTheme:'primary',
+      desc:'90日价格分位 92%（≥90% 高位阈值）+ 换手率 90 日分位 95%，信号成立即提示。' },
+    { time:'9/12 15:05', dot:'t-review', title:'日级复盘收录', tag:'日报', tagTheme:'default',
+      desc:'风险榜升至第 2 位（高），标注"技术过热 + 利好兑现"。' }
+  ],
+  '002594': [
+    { time:'9/11 晚间', dot:'t-event', title:'S1 事件触发', tag:'公司公告', tagTheme:'danger',
+      desc:'披露 8 月新能源车销量 37.3 万辆，同比 +21%（公司公告），事件级第一触发源。' },
+    { time:'9/12 10:12', dot:'t-event', title:'异动与公告直接对应', tag:'事件级', tagTheme:'danger',
+      desc:'涨幅 +2.35%、量比 1.8，闸门判定事件驱动型，归因可信度高，直接事件级推送。' },
+    { time:'9/12 盘前 8:30', dot:'t-fs', title:'前瞻预警生成', tag:'日历事件', tagTheme:'primary',
+      desc:'9/15 乘联会零售数据进入前 3 日窗口，预置渗透率三档情景。' },
+    { time:'9/15 待落地', dot:'t-fill', title:'零售数据 → 回填', tag:'待回填', tagTheme:'success',
+      desc:'留意零售与批发增速差，验证渠道库存路径。' }
+  ],
+  '600036': [
+    { time:'9/08 盘后', dot:'t-fs', title:'宏观清单例行校验', tag:'关键', tagTheme:'danger',
+      desc:'8月社融数据符合预期（央行 9/8），LPR 对息差的传导为该股关键级信号。' },
+    { time:'9/12 盘前 8:30', dot:'t-fs', title:'前瞻预警生成', tag:'日历事件', tagTheme:'primary',
+      desc:'9/22 LPR 报价进入前瞻窗口，预置"下调/持平"两档情景；一致预期持平。' },
+    { time:'9/12 15:05', dot:'t-review', title:'日级复盘收录', tag:'日报', tagTheme:'default',
+      desc:'当日 -0.86% 未触发阈值；风险榜第 5 位（低）。' }
+  ],
+  '601012': [
+    { time:'9/10 盘后', dot:'t-fs', title:'趋势事实确认', tag:'关键', tagTheme:'danger',
+      desc:'8月新增光伏装机同比 -12%（国家能源局 9/10），行业直接需求端量数据同比转负。' },
+    { time:'9/11 盘后', dot:'t-fs', title:'时间共振升级', tag:'共振', tagTheme:'danger',
+      desc:'组件价格连续 3 周下行（PVInfoLink 9/11），与装机走弱形成双弱共振，升级一级提示。' },
+    { time:'9/12 14:05', dot:'t-alert', title:'盘中扫描命中', tag:'异动 · 盘中级', tagTheme:'warning',
+      desc:'跌幅 -3.15%、量比 2.1，方向与权威数据同向 → 数据印证型，写传导链推送。' },
+    { time:'9/12 15:05', dot:'t-review', title:'日级复盘收录', tag:'日报', tagTheme:'default',
+      desc:'风险榜第 3 位（中），"装机走弱 + 组件跌价，趋势确认"。' }
+  ],
+  '00700': [
+    { time:'9/12 11:20', dot:'t-alert', title:'阈值边缘触发', tag:'闸门拦截', tagTheme:'default',
+      desc:'涨幅 +0.92% 接近港股 ±3% 监控边缘，进入识别流程。' },
+    { time:'9/12 11:21', dot:'t-review', title:'判定：暂无覆盖 + 无事实', tag:'仅报异动', tagTheme:'default',
+      desc:'互联网行业不在映射表 → 显式标记「暂无覆盖」；30 天内无完整三元组事实 → 只报异动，不归因。' },
+    { time:'9/12 15:05', dot:'t-review', title:'日级复盘收录', tag:'日报', tagTheme:'default',
+      desc:'列入"未归因：归因待补充"，不强行制造风险感。' }
+  ],
+  '03690': [
+    { time:'9/11 收盘后', dot:'t-fs', title:'资金行为面记录', tag:'参考级', tagTheme:'default',
+      desc:'沽空比例 12.8%（S6，近一年 85% 分位），仅作背景，不单独构成风险提示。' },
+    { time:'9/12 15:05', dot:'t-review', title:'日级复盘收录', tag:'日报', tagTheme:'default',
+      desc:'当日 -1.94% 未触发港股 ±3% 阈值；行业暂无覆盖，无推送。' }
+  ]
+};
+
+const TIERS = [
+  { name:'免费版', price:'¥0', unit:'/月', desc:'体验事前预警', cta:'立即使用',
+    features:['自选标的 ≤ 5 只','每日 1 次前瞻日历推送','异动快讯（延迟 30 分钟）','基础风险提示'] },
+  { name:'Pro 版', price:'¥30', unit:'/月（年费¥365）', desc:'个人投资者的风控 Agent', hot:true, cta:'开通 Pro',
+    features:['自选标的不限量','盘中 5 分钟扫描实时推送','情景化前瞻 + 落地回填','完整事实三元组与核验过程','行业映射覆盖申请','月度风险复盘报告'] },
+  { name:'机构版', price:'面议', unit:'', desc:'券商/私募的风控基础设施', cta:'预约演示',
+    features:['API 信号流接入','白标嵌入自有 App','全市场异动监测信息集','行业映射表定制扩展','私有化部署选项'] }
+];
+
+createApp({
+  data() {
+    return {
+      activeMenu: 'overview',
+      menus: [
+        { key:'overview',  label:'监测总览', sub:'风险榜 · 日报 · 最新快讯', icon:ICONS.dash },
+        { key:'foresight', label:'前瞻预警', sub:'事前路径 · 未来 7 日事件与情景分支', icon:ICONS.cal },
+        { key:'alerts',    label:'异动归因', sub:'事后路径 · 快讯体与核验闸门', icon:ICONS.bolt },
+        { key:'watchlist', label:'自选股',   sub:'比对集合与行业映射覆盖', icon:ICONS.star },
+        { key:'business',  label:'商业模式', sub:'订阅分层 · 数据飞轮 · 变现路径', icon:ICONS.coin }
+      ],
+      alerts: [...ALERTS],
+      foresights: [...FORESIGHTS],
+      stocks: STOCKS,
+      markets: MARKETS,
+      timelines: TIMELINES,
+      marketFilter: '全部',
+      riskBoard: RISK_BOARD,
+      tiers: TIERS,
+      gateFilter: '全部',
+      fsFilter: '全部',
+      alertDrawer: false, curAlert: null,
+      fsDrawer: false, curFs: null,
+      stockDialog: false, curStock: null,
+      unread: 0,
+      nowTime: '',
+      alertSeq: 100,
+      loggedIn: false, agreed: false, authing: false, authSheet: false,
+      showPhone: false, phone: '', smsCode: '', codeTimer: 0,
+      chartsReady: false,
+      user: { name: '微信用户_8848' }
+    };
+  },
+  computed: {
+    currentMenu() { return this.menus.find(m => m.key === this.activeMenu); },
+    filteredAlerts() { return this.alerts.filter(a => this.gateFilter === '全部' || a.gate === this.gateFilter); },
+    filteredForesights() { return this.foresights.filter(f => this.fsFilter === '全部' || f.type === this.fsFilter); },
+    filteredStocks() { return this.stocks.filter(s => this.marketFilter === '全部' || s.market === this.marketFilter); },
+    curTimeline() { return this.curStock ? (this.timelines[this.curStock.code] || []) : []; }
+  },
+  methods: {
+    // ===== 登录 =====
+    wxLogin() { if (!this.agreed) { TDesign.MessagePlugin.warning('请先勾选并同意《用户协议》与《隐私政策》'); return; } this.authSheet = true; },
+    allowAuth() {
+      this.authing = true;
+      setTimeout(() => { this.authing = false; this.authSheet = false; this.enterApp('微信登录成功，欢迎回来'); }, 900);
+    },
+    denyAuth() { this.authSheet = false; TDesign.MessagePlugin.info('已取消授权，可重新点击登录'); },
+    sendCode() {
+      if (!/^1\d{10}$/.test(this.phone)) { TDesign.MessagePlugin.warning('请输入正确的 11 位手机号'); return; }
+      this.codeTimer = 60;
+      const t = setInterval(() => { if (--this.codeTimer <= 0) clearInterval(t); }, 1000);
+      TDesign.MessagePlugin.success('验证码已发送（演示：任意 6 位数字均可）');
+    },
+    phoneLogin() {
+      if (!this.agreed) { TDesign.MessagePlugin.warning('请先勾选并同意《用户协议》与《隐私政策》'); return; }
+      if (!/^1\d{10}$/.test(this.phone)) { TDesign.MessagePlugin.warning('请输入正确的 11 位手机号'); return; }
+      if (!/^\d{6}$/.test(this.smsCode)) { TDesign.MessagePlugin.warning('请输入 6 位数字验证码'); return; }
+      this.user.name = '用户_' + this.phone.slice(-4);
+      this.enterApp('手机号登录成功');
+    },
+    enterApp(msg) {
+      this.loggedIn = true;
+      this.$nextTick(() => { if (!this.chartsReady) { this.chartsReady = true; this.initCharts(); } });
+      TDesign.MessagePlugin.success(msg);
+    },
+    logout() {
+      this.loggedIn = false; this.agreed = false; this.showPhone = false;
+      this.phone = ''; this.smsCode = ''; this.user = { name: '微信用户_8848' };
+    },
+    tipProtocol() { TDesign.MessagePlugin.info('演示环境，协议内容略'); },
+
+    // ===== 交互 =====
+    openAlert(a) { this.curAlert = a; this.alertDrawer = true; },
+    openForesight(f) { this.curFs = f; this.fsDrawer = true; },
+    openStock(s) { this.curStock = s; this.stockDialog = true; },
+    openMarket(m) {
+      this.marketFilter = m.filters.length === 1 ? m.filters[0] : '全部';
+      this.activeMenu = 'watchlist';
+      if (m.filters.length > 1) {
+        TDesign.MessagePlugin.info(m.name + ' 覆盖多个板块，已展示全部，可用筛选器细分');
+      }
+    },
+    openBoardItem(r) {
+      if (r.link.kind === 'alert') { const a = this.alerts.find(x => x.id === r.link.id); if (a) this.openAlert(a); }
+      else { const f = this.foresights.find(x => x.id === r.link.id); if (f) this.openForesight(f); }
+    },
+    feedback(ok) {
+      this.alertDrawer = false;
+      TDesign.MessagePlugin.success(ok ? '已采纳，同类信号保持当前级别' : '已记录误报，闸门将下调该类信号权重');
+    },
+    simulateScan() {
+      const pool = this.stocks.filter(s => s.covered);
+      const st = pool[Math.floor(Math.random() * pool.length)];
+      const chg = +((Math.random() * 8 - 4).toFixed(2));
+      const ratio = (1.5 + Math.random() * 1.8).toFixed(1);
+      const noFact = Math.random() < 0.35;
+      const a = noFact ? {
+        id: ++this.alertSeq, level:'盘中级', cardCls:'lv-none', gate:'无事实', gateTheme:'default', time:'刚刚',
+        name: st.name, code: st.code, chg: chg,
+        titleLine: '【异动】' + st.name + '(' + st.code + ') ' + (chg >= 0 ? '+' : '') + chg + '%，量比 ' + ratio,
+        newsLine:'', techLine:'',
+        conclusion:'触发日内涨跌幅阈值监控，30 天内无可溯源权威数据印证，仅报异动，不归因',
+        facts:[],
+        gateNote:'盘中扫描命中价格阈值 → 进入②识别，但未通过相关性三重初筛或提取不到完整三元组 → 闸门拦截，只报异动。',
+        fullText:'【异动】' + st.name + '(' + st.code + ') ' + (chg >= 0 ? '+' : '') + chg + '%，量比 ' + ratio + '\n触发日内涨跌幅阈值监控，30 天内无可溯源权威数据印证，仅报异动，不归因\n仅供参考，不构成投资建议'
+      } : {
+        id: ++this.alertSeq, level:'盘中级', cardCls:'lv-intra', gate:'数据印证型', gateTheme:'primary', time:'刚刚',
+        name: st.name, code: st.code, chg: chg,
+        titleLine: '【异动 · 盘中级】' + st.name + '(' + st.code + ') ' + (chg >= 0 ? '+' : '') + chg + '%，量比 ' + ratio,
+        newsLine: '行业高频数据与异动同向<span class="fc-src">（S4 三方行情 9/12）</span>',
+        techLine: '量比 ' + ratio + '，90日价格分位测算中（截至 9/12 盘中）',
+        conclusion:'异动方向与近 30 天权威数据同向，写传导链待收盘确认',
+        facts:[ {src:'S4 三方行情（待补一手源）', date:'2026-09-12', val:'量比 ' + ratio + '，方向与行业数据一致'} ],
+        gateNote:'实时扫描生成的盘中级信号：已通过时间/对象/方向三重初筛，一手源复核与技术面窗口将在日终复盘补全；若复核不通过将降级为「无事实」。',
+        fullText:'【异动 · 盘中级】' + st.name + '(' + st.code + ') ' + (chg >= 0 ? '+' : '') + chg + '%，量比 ' + ratio + '\n消息面｜行业高频数据与异动同向（S4 三方行情 9/12）\n技术面｜量比 ' + ratio + '，90日价格分位测算中\n异动方向与近 30 天权威数据同向，写传导链待收盘确认\n仅供参考，不构成投资建议'
+      };
+      this.alerts.unshift(a);
+      this.unread++;
+      TDesign.NotificationPlugin.warning({
+        title: '盘中扫描命中 · ' + st.name,
+        content: a.titleLine,
+        duration: 4000,
+        placement: 'top-right'
+      });
+    },
+    tick() {
+      const d = new Date();
+      this.nowTime = d.toTimeString().slice(0, 8) + ' · 下次扫描 ' + (5 - d.getMinutes() % 5) + ' 分钟内';
+    },
+    initCharts() {
+      if (typeof echarts === 'undefined') return;
+      const el = document.getElementById('chartGate');
+      if (!el) return;
+      const c = echarts.init(el);
+      c.setOption({
+        title: { text: '核验闸门判定分布（今日）', left: 0, top: 0, textStyle: { fontSize: 14, fontWeight: 600 } },
+        tooltip: { trigger: 'item' },
+        legend: { bottom: 0, textStyle: { fontSize: 11 } },
+        series: [{
+          type: 'pie', radius: ['48%', '70%'], center: ['50%', '52%'], label: { show: false },
+          data: [
+            { value: 1, name: '事件驱动型', itemStyle: { color: '#D54941' } },
+            { value: 1, name: '数据印证型', itemStyle: { color: '#0052D9' } },
+            { value: 1, name: '利好兑现型', itemStyle: { color: '#E37318' } },
+            { value: 1, name: '数据背离型', itemStyle: { color: '#fa9550' } },
+            { value: 1, name: '无事实拦截', itemStyle: { color: '#a6a6a6' } }
+          ]
+        }]
+      });
+      window.addEventListener('resize', function() { c.resize(); });
+    }
+  },
+  watch: {
+    activeMenu(v) { if (v === 'alerts') this.unread = 0; }
+  },
+  mounted() {
+    this.tick();
+    setInterval(this.tick, 1000);
+  }
+}).use(TDesign).mount('#app');
+</script>
+</body>
+</html>
